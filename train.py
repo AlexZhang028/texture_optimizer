@@ -22,8 +22,8 @@ def train(args):
     model.train()
     tb_writer = SummaryWriter(save_dir)
 
-    # iter_start = torch.cuda.Event(enable_timing=True)
-    # iter_end = torch.cuda.Event(enable_timing=True)
+    iter_start = torch.cuda.Event(enable_timing=True)
+    iter_end = torch.cuda.Event(enable_timing=True)
 
     for epoch in range(epochs):
         model.train()
@@ -33,16 +33,17 @@ def train(args):
             camera = data["camera"]
             gt_image = data["image"]
 
-            # iter_start.record()
+            iter_start.record()
             rendered_image = model(camera)
             loss = F.l1_loss(rendered_image, gt_image)
             loss.backward()
 
-            # iter_end.record()
-            # iter_time = iter_start.elapsed_time(iter_end)
+            iter_end.record()
+            torch.cuda.synchronize()
+            iter_time = iter_start.elapsed_time(iter_end)
             pbar.set_postfix({'Loss': loss.item()})
             tb_writer.add_scalar("Loss", loss.item(), iteration)
-            # tb_writer.add_scalar("Iteration Time", iter_time, iteration)
+            tb_writer.add_scalar("Iteration Time", iter_time, iteration)
             optimizer.step()
             optimizer.zero_grad()
         
