@@ -32,7 +32,8 @@ class TextOptiModel(nn.Module):
         self.raster_settings = RasterizationSettings(
             image_size=self.render_image_size, 
             blur_radius=0.0, 
-            faces_per_pixel=1, 
+            faces_per_pixel=1,
+            bin_size=100
         )
         texture = TexturesUV(maps=self.texture_img[None, ...], faces_uvs=self.faces_uvs[None, ...], verts_uvs=self.verts_uvs[None, ...])
         self.meshes = Meshes(verts=[self.verts], faces=[self.faces.verts_idx], textures=texture)
@@ -58,9 +59,11 @@ class TextOptiModel(nn.Module):
         return images.squeeze()[:, :, :3]
     
     def save_texture(self, file_path: str):
+        self.texture_img.data.clamp_(0, 1)
         texture_img = self.texture_img.detach().cpu().numpy()
+        np.save(file_path.split(".")[0] + ".npy", texture_img)
         texture_img = (texture_img * 255).astype(np.uint8)
-        cv2.imwrite(file_path, texture_img)
+        cv2.imwrite(file_path, cv2.cvtColor(texture_img, cv2.COLOR_RGB2BGR))
 
     def save_mesh(self, file_path: str):
         pass

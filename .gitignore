@@ -2,3 +2,6 @@ runs/
 data/
 __pycache__/
 *.ipynb
+*.obj
+*.mtl
+*.png

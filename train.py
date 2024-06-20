@@ -16,9 +16,11 @@ def train(args):
     save_dir = args.save_dir
     os.makedirs(save_dir, exist_ok=True)
     mesh_path = os.path.join(data_dir, "mesh", args.mesh_name)
-    train_loader, image_shape = get_dataloader(data_dir, args.camera_param_type, batch_size=1, device=args.device)
+    train_loader, val_loader, image_shape = get_dataloader(data_dir, batch_size=1, split_ratio=0.99, device=args.device)
     model = TextOptiModel(mesh_path, args.texture_size, image_shape, args.device)
+
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     model.train()
     tb_writer = SummaryWriter(save_dir)
 
@@ -44,10 +46,14 @@ def train(args):
             pbar.set_postfix({'Loss': loss.item()})
             tb_writer.add_scalar("Loss", loss.item(), iteration)
             tb_writer.add_scalar("Iteration Time", iter_time, iteration)
+            tb_writer.add_scalar("Learning Rate", scheduler.get_last_lr()[0], iteration)
             optimizer.step()
             optimizer.zero_grad()
+            if iteration % 500 == 0:
+                validate(model, tb_writer, val_loader, iteration, epoch)
+                scheduler.step()
+                
         
-        validate(model, tb_writer, train_loader, iteration, epoch)
 
     model.save_texture(os.path.join(save_dir, "texture.png"))
 
@@ -64,12 +70,14 @@ def validate(model, writer, val_loader, iteration, epoch):
             rendered_image = model(camera)
             imgs = torch.cat((imgs, rendered_image.unsqueeze(0)), dim=0)
             gts = torch.cat((gts, gt_image.unsqueeze(0)), dim=0)
+            if i == 10:
+                break
         loss = F.l1_loss(imgs, gts)
         writer.add_scalar("Val Loss", loss.item(), iteration)
-        writer.add_images("Rendered Images", imgs[:3], iteration, dataformats="NHWC")
-        writer.add_images("Ground Truth Images", gts[:3], iteration, dataformats="NHWC")
-        writer.add_image("Texture", model.texture_img, iteration, dataformats="HWC")
-        print(f"Epoch: {epoch+1}, validation Loss: {loss.item()}")
+        writer.add_images("Rendered Images", imgs, iteration, dataformats="NHWC")
+        writer.add_images("Ground Truth Images", gts, iteration, dataformats="NHWC")
+        writer.add_image("Texture", model.texture_img.data.clamp_(0, 1), iteration, dataformats="HWC")
+        # print(f"Epoch: {epoch+1}, validation Loss: {loss.item()}")
 
 
 if __name__ == "__main__":
