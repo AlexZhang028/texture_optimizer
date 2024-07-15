@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import numpy as np
 from dataloader import get_dataloader
 from model import TextOptiModel
 from torch.utils.tensorboard import SummaryWriter
@@ -20,7 +21,7 @@ def train(args):
     model = TextOptiModel(mesh_path, args.texture_size, image_shape, args.device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    # scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     model.train()
     tb_writer = SummaryWriter(save_dir)
 
@@ -34,9 +35,13 @@ def train(args):
             iteration = epoch * len(train_loader) + i + 1
             camera = data["camera"]
             gt_image = data["image"]
+            mask = data["mask"]
+            gt_image = gt_image * torch.tensor(mask[:,:,np.newaxis]).to(args.device)
 
             iter_start.record()
             rendered_image = model(camera)
+            rendered_image = rendered_image * torch.tensor(mask[:,:,np.newaxis]).to(args.device)
+
             loss = F.l1_loss(rendered_image, gt_image)
             loss.backward()
 
@@ -46,12 +51,12 @@ def train(args):
             pbar.set_postfix({'Loss': loss.item()})
             tb_writer.add_scalar("Loss", loss.item(), iteration)
             tb_writer.add_scalar("Iteration Time", iter_time, iteration)
-            tb_writer.add_scalar("Learning Rate", scheduler.get_last_lr()[0], iteration)
+            # tb_writer.add_scalar("Learning Rate", scheduler.get_last_lr()[0], iteration)
             optimizer.step()
             optimizer.zero_grad()
             if iteration % 500 == 0:
                 validate(model, tb_writer, val_loader, iteration, epoch)
-                scheduler.step()
+                # scheduler.step()
                 
         
 

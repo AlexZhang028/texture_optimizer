@@ -33,7 +33,13 @@ class CustomDataset(Dataset):
             self.image_paths = []
             for camera_name in camera_dir:
                 num_images[camera_name] = len(os.listdir(os.path.join(images_dir, camera_name)))
-                self.image_paths += [os.path.join(images_dir, camera_name, i) for i in os.listdir(os.path.join(images_dir, camera_name)) if i.endswith(".png") or i.endswith(".jpg")]
+                image_paths = [os.path.join(images_dir, camera_name, i) for i in os.listdir(os.path.join(images_dir, camera_name)) if i.endswith(".png") or i.endswith(".jpg") or i.endswith(".jpeg")]
+                if os.path.exists(os.path.join(data_dir, "indices.npy")):
+                    image_paths.sort()
+                    moving_indices = np.load(os.path.join(data_dir, "indices.npy"))
+                    image_paths = [image_paths[i] for i in moving_indices]
+                self.image_paths += image_paths
+
         else:
             self.camera_param_type = "fov"
             images_dir = os.path.join(images_dir, camera_dir[0])
@@ -44,7 +50,7 @@ class CustomDataset(Dataset):
             self.T = torch.tensor(self.poses[:, :3, 3])
 
         self.image_paths_train, self.image_paths_val = train_test_split(self.image_paths, test_size=1-split_ratio, random_state=42)
-        assert len(self.image_paths) == len(self.poses) or len(self.image_paths) == len(self.poses) * len(camera_dir), "Number of images and poses do not match"
+        # assert len(self.image_paths) == len(self.poses) or len(self.image_paths) == len(self.poses) * len(camera_dir), "Number of images and poses do not match"
         if split == 'train':
             self.image_paths = self.image_paths_train
         else:
@@ -66,6 +72,8 @@ class CustomDataset(Dataset):
         elif self.camera_param_type == "intrinsic":
             image_path = self.image_paths[index]
             gt_image = load_gt_image(image_path).to(self.device)
+            mask_path = image_path.replace("imgs", "masks").split(".")[0] + ".npz"
+            mask = np.load(mask_path)["arr_0"]
             camera_name = image_path.split("/")[-2]
             intrinsic = torch.tensor(self.camera_info[camera_name]["intrinsic"]).unsqueeze(0).to(self.device)
             transform = torch.tensor(self.camera_info[camera_name]["transform"]).unsqueeze(0).to(self.device).float()
@@ -81,6 +89,7 @@ class CustomDataset(Dataset):
 
         return {
             "image": gt_image,
+            "mask": mask,
             "camera": camera,
             "image_path": image_path,
             }
