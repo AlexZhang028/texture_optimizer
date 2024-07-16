@@ -49,12 +49,10 @@ class CustomDataset(Dataset):
             self.R = torch.tensor(self.poses[:, :3, :3])
             self.T = torch.tensor(self.poses[:, :3, 3])
 
-        self.image_paths_train, self.image_paths_val = train_test_split(self.image_paths, test_size=1-split_ratio, random_state=42)
-        # assert len(self.image_paths) == len(self.poses) or len(self.image_paths) == len(self.poses) * len(camera_dir), "Number of images and poses do not match"
-        if split == 'train':
-            self.image_paths = self.image_paths_train
-        else:
-            self.image_paths = self.image_paths_val
+        if split == 'val':
+            self.image_paths = np.random.choice(self.image_paths, size=10, replace=False)
+            
+
 
 
 
@@ -106,6 +104,7 @@ def get_dataloader(data_dir, batch_size=1, device="cuda", split_ratio=0.8):
     image_shape = (image.shape[0], image.shape[1])
     dataset_train = CustomDataset(data_dir, split='train', split_ratio=split_ratio, device=device)
     dataset_val = CustomDataset(data_dir, split='val', split_ratio=split_ratio, device=device)
+    print("Train dataset size: ", len(dataset_train), "Val dataset size: ", len(dataset_val))
     dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     dataloader_val = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     return dataloader_train, dataloader_val, image_shape

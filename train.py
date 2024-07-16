@@ -21,7 +21,7 @@ def train(args):
     model = TextOptiModel(mesh_path, args.texture_size, image_shape, args.device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
     model.train()
     tb_writer = SummaryWriter(save_dir)
 
@@ -51,12 +51,14 @@ def train(args):
             pbar.set_postfix({'Loss': loss.item()})
             tb_writer.add_scalar("Loss", loss.item(), iteration)
             tb_writer.add_scalar("Iteration Time", iter_time, iteration)
-            # tb_writer.add_scalar("Learning Rate", scheduler.get_last_lr()[0], iteration)
+            tb_writer.add_scalar("Learning Rate", scheduler.get_last_lr()[0], iteration)
             optimizer.step()
             optimizer.zero_grad()
+            
             if iteration % 500 == 0:
                 validate(model, tb_writer, val_loader, iteration, epoch)
-                # scheduler.step()
+                scheduler.step()
+                
                 
         
 
